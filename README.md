@@ -1,80 +1,70 @@
-# 🚀 Fine-Tuning LLaMA-2 with 4-bit Quantization & LoRA
+Finetuning LLMs using Quantization and LoRA
 
-[![Python](https://img.shields.io/badge/Python-3.12-blue)](https://www.python.org/)
-[![Hugging Face](https://img.shields.io/badge/Hugging_Face-Transformers-orange)](https://huggingface.co/)
-[![License](https://img.shields.io/badge/License-Educational-green)](#license)
+This project demonstrates fine-tuning large language models (LLMs), specifically Meta's LLaMA-2, using quantization and LoRA (Low-Rank Adaptation) to optimize for memory and computational efficiency. The project also leverages the Hugging Face Transformers and PEFT libraries.
 
-This project demonstrates **fine-tuning a large language model (LLaMA-2 7B)** using **4-bit quantization** and **LoRA (Low-Rank Adaptation)** for **memory-efficient supervised fine-tuning**.
+🔹 Project Overview
 
----
+Large language models are highly powerful but resource-intensive. This project focuses on techniques to efficiently fine-tune these models for custom tasks:
 
-## 📌 Table of Contents
+LoRA (Low-Rank Adaptation)
 
-1. [Installation](#installation)
-2. [Hugging Face Authentication](#hugging-face-authentication)
-3. [Dataset Loading](#dataset-loading)
-4. [Tokenizer Setup](#tokenizer-setup)
-5. [Quantization Setup](#quantization-setup)
-6. [Model Loading with Quantization](#model-loading-with-quantization)
-7. [Model Configuration Adjustments](#model-configuration-adjustments)
-8. [LoRA Configuration](#lora-configuration)
-9. [Training Arguments](#training-arguments)
-10. [SFTTrainer Setup](#sfttrainer-setup)
-11. [Training and Push to Hub](#training-and-pushing-to-hugging-face-hub)
-12. [Notes](#notes)
-13. [License](#license)
+Fine-tunes large models efficiently using low-rank matrices.
 
----
+Reduces computation and memory usage while maintaining performance.
 
-## 🛠 Installation
+Quantization
 
-```bash
-pip install accelerate==0.21.0 \
-            peft==0.4.0 \
-            bitsandbytes==0.40.2 \
-            transformers==4.30.2 \
-            trl==0.4.7 \
-            datasets
-```
+Converts high-precision model weights (32-bit) into lower-precision (4-bit) for faster inference and smaller model size.
 
----
+Ideal for deployment on limited-resource devices.
 
-## 🔑 Hugging Face Authentication
+Trainer & SFTTrainer
 
-```python
-from huggingface_hub import notebook_login
-notebook_login()
-```
+Uses Hugging Face Trainer and SFTTrainer for supervised fine-tuning.
 
----
+Supports gradient accumulation, learning rate scheduling, and push-to-Hub functionality.
 
-## 📚 Dataset Loading
+🔹 Key Features
 
-```python
-from datasets import load_dataset
+Fine-tuning LLaMA-2 7B model on custom datasets.
 
-data = load_dataset("timdettmers/openassistant-guanaco", split="train")
-print(data)
-```
+Integration of 4-bit quantization using bitsandbytes.
 
----
+Efficient parameter tuning via LoRA.
 
-## 📝 Tokenizer Setup
+Uploading fine-tuned models directly to Hugging Face Hub.
 
-### For LLaMA-2:
+🔹 Prerequisites
+pip install accelerate==0.21.0 peft==0.4.0 bitsandbytes==0.40.2 transformers==4.30.2 trl==0.4.7 datasets
 
-```python
+
+Hugging Face account & token (Sign Up
+)
+
+Access to Meta’s LLaMA-2 (Download
+)
+
+🔹 Project Structure
+
+tokenizer_setup.py – Initialize and configure tokenizer.
+
+model_quantization.py – Load model with 4-bit quantization.
+
+lora_setup.py – Configure LoRA for efficient fine-tuning.
+
+train.py – Training script using SFTTrainer.
+
+README.md – Project documentation.
+
+🔹 Code Snippets
+Tokenizer
 from transformers import AutoTokenizer
 
 tokenizer = AutoTokenizer.from_pretrained("meta-llama/Llama-2-7b-hf", use_auth_token=True)
 tokenizer.pad_token = tokenizer.eos_token
-```
 
----
-
-## ⚡ Quantization Setup
-
-```python
+Model with Quantization
+from transformers import AutoModelForCausalLM
 from transformers import BitsAndBytesConfig
 
 bnb_config = BitsAndBytesConfig(
@@ -83,36 +73,14 @@ bnb_config = BitsAndBytesConfig(
     bnb_4bit_use_double_quant=True,
     bnb_4bit_compute_dtype="float16"
 )
-```
-
----
-
-## 🖥 Model Loading with Quantization
-
-```python
-from transformers import AutoModelForCausalLM
 
 model = AutoModelForCausalLM.from_pretrained(
     "meta-llama/Llama-2-7b-hf",
     quantization_config=bnb_config,
     device_map={"": 0}
 )
-```
 
----
-
-## ⚙️ Model Configuration Adjustments
-
-```python
-model.config.use_cache = False
-model.config.pretraining_tp = 1
-```
-
----
-
-## 🔗 LoRA Configuration
-
-```python
+LoRA Configuration
 from peft import LoraConfig
 
 peft_config = LoraConfig(
@@ -122,17 +90,54 @@ peft_config = LoraConfig(
     bias="none",
     task_type="CAUSAL_LM"
 )
-```
 
----
-
-## 🎯 Training Arguments
-
-```python
+Training
 from transformers import TrainingArguments
+from trl import SFTTrainer
 
 training_arguments = TrainingArguments(
     output_dir="llama2_finetuned_chatbot",
     per_device_train_batch_size=8,
-    gradi
-```
+    gradient_accumulation_steps=4,
+    optim="paged_adamw_4bit",
+    learning_rate=2e-4,
+    lr_scheduler_type="linear",
+    save_strategy="epoch",
+    logging_steps=10,
+    num_train_epochs=1,
+    max_steps=10,
+    push_to_hub=True
+)
+
+trainer = SFTTrainer(
+    model=model,
+    train_dataset=data,
+    peft_config=peft_config,
+    dataset_text_field="text",
+    args=training_arguments,
+    tokenizer=tokenizer,
+    max_seq_length=512
+)
+
+trainer.train()
+trainer.push_to_hub()
+
+🔹 References
+
+LLaMA-2 on Hugging Face
+
+LoRA (Low-Rank Adaptation) Paper
+
+BitsAndBytes Quantization
+
+Hugging Face Transformers
+
+🔹 Outcome
+
+Successfully fine-tuned a 7B parameter LLaMA-2 model with 4-bit quantization and LoRA.
+
+Reduced memory footprint and computation time while retaining performance.
+
+Model available for inference or further fine-tuning.
+
+
